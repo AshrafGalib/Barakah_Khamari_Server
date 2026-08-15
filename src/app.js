@@ -34,9 +34,66 @@ const app = express();
 // CORS
 // ======================================================
 
+// Allowed frontend origins
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://barakahkhamari.netlify.app",
+];
+
+// Normalize origin
+const normalizeOrigin = (origin) => {
+  if (!origin) {
+    return origin;
+  }
+
+  return origin.replace(/\/$/, "");
+};
+
 app.use(
   cors({
-    origin: "https://barakahkhamari.netlify.app/",
+    origin: (origin, callback) => {
+      // Allow requests without an Origin header
+      // e.g. Postman, server-to-server requests
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const normalizedOrigin =
+        normalizeOrigin(origin);
+
+      if (
+        allowedOrigins.includes(
+          normalizedOrigin
+        )
+      ) {
+        return callback(null, true);
+      }
+
+      console.error(
+        "CORS blocked origin:",
+        origin
+      );
+
+      return callback(
+        new Error("Not allowed by CORS")
+      );
+    },
+
+    credentials: true,
+
+    methods: [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE",
+      "OPTIONS",
+    ],
+
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+    ],
   })
 );
 
