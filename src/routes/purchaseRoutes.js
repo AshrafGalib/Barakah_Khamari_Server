@@ -8,31 +8,53 @@ const {
   deletePurchase,
 } = require("../controllers/purchaseController");
 
-const router =
-  express.Router();
+const authMiddleware = require("../middleware/authMiddleware");
+
+const {
+  requirePermission,
+} = require("../middleware/permissionMiddleware");
+
+const {
+  PERMISSIONS,
+} = require("../constants/permissionConstants");
+
+const router = express.Router();
+
+// ======================================================
+// Purchase Routes
+// ======================================================
 
 // ==========================================
 // সব Purchase
+// Permission: purchases.view
 // ==========================================
 
 router.get(
   "/",
+  authMiddleware,
+  requirePermission(
+    PERMISSIONS.PURCHASES_VIEW
+  ),
   getPurchases
 );
 
 // ==========================================
 // নতুন Purchase
+// Permission: purchases.create
 // ==========================================
 
 router.post(
   "/",
+  authMiddleware,
+  requirePermission(
+    PERMISSIONS.PURCHASES_CREATE
+  ),
   createPurchase
 );
 
 // ==========================================
-// Supplier Due Payment
+// Purchase Due Payment
 //
-// Example:
 // PATCH /api/purchases/:id/due-payment
 //
 // Body:
@@ -40,30 +62,45 @@ router.post(
 //   "paymentAmount": 2000,
 //   "paymentMethod": "ক্যাশ"
 // }
+//
+// Permission: purchases.update
 // ==========================================
 
 router.patch(
   "/:id/due-payment",
+  authMiddleware,
+  requirePermission(
+    PERMISSIONS.PURCHASES_UPDATE
+  ),
   payPurchaseDue
 );
 
 // ==========================================
 // একটি Purchase
 //
-// এটি dynamic route
+// Permission: purchases.view
 // ==========================================
 
 router.get(
   "/:id",
+  authMiddleware,
+  requirePermission(
+    PERMISSIONS.PURCHASES_VIEW
+  ),
   getPurchase
 );
 
 // ==========================================
 // Purchase Delete
+// Permission: purchases.delete
 // ==========================================
 
 router.delete(
   "/:id",
+  authMiddleware,
+  requirePermission(
+    PERMISSIONS.PURCHASES_DELETE
+  ),
   deletePurchase
 );
 

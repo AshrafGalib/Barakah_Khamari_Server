@@ -28,6 +28,16 @@ const expenseRoutes =
 const cashBalanceRoutes =
   require("./routes/cashBalanceRoutes");
 
+
+const authRoutes = require("./routes/authRoutes");
+
+
+const roleRoutes =
+  require("./routes/roleRoutes");
+
+const userRoutes =
+  require("./routes/userRoutes");
+
 const app = express();
 
 // ======================================================
@@ -162,6 +172,18 @@ app.use(
 app.use(
   "/api/cash-balance",
   cashBalanceRoutes
+);
+
+app.use("/api/auth", authRoutes);
+
+app.use(
+  "/api/roles",
+  roleRoutes
+);
+
+app.use(
+  "/api/users",
+  userRoutes
 );
 
 // ======================================================
