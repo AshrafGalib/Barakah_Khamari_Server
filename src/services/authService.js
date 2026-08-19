@@ -8,52 +8,65 @@ const { getDB } = require("../config/db");
 // Configuration
 // ======================================================
 
-const JWT_SECRET =
-  process.env.JWT_SECRET;
-
-const JWT_EXPIRES_IN =
-  process.env.JWT_EXPIRES_IN || "7d";
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
 
 if (!JWT_SECRET) {
-  throw new Error(
-    "JWT_SECRET environment variable is missing"
-  );
+  throw new Error("JWT_SECRET environment variable is missing");
 }
 
 // ======================================================
-// Collection
+// Collections
 // ======================================================
 
-const getUsersCollection = () => {
-  const db = getDB();
-
-  return db.collection("users");
-};
+const getUsersCollection = () => getDB().collection("users");
+const getRolesCollection = () => getDB().collection("roles");
 
 // ======================================================
-// Roles Collection
+// Helper: Resolve User Permissions
 // ======================================================
 
-const getRolesCollection = () => {
-  const db = getDB();
+const getUserPermissions = async (user) => {
+  // System Admin always gets wildcard access
+  if (user.role === "admin" || user.role === "super_admin") {
+    return ["*"];
+  }
 
-  return db.collection("roles");
+  if (!user.roleId) {
+    return [];
+  }
+
+  let roleObjectId;
+  try {
+    roleObjectId =
+      user.roleId instanceof ObjectId
+        ? user.roleId
+        : new ObjectId(user.roleId);
+  } catch (error) {
+    return [];
+  }
+
+  const roleDoc = await getRolesCollection().findOne({
+    _id: roleObjectId,
+    isActive: true,
+  });
+
+  return roleDoc && Array.isArray(roleDoc.permissions)
+    ? roleDoc.permissions
+    : [];
 };
 
 // ======================================================
 // Generate JWT
 // ======================================================
 
-const generateToken = (user) => {
+const generateToken = (user, permissions = []) => {
   return jwt.sign(
     {
       userId: user._id.toString(),
-
       role: user.role || null,
-
-      roleId: user.roleId
-        ? user.roleId.toString()
-        : null,
+      roleId: user.roleId ? user.roleId.toString() : null,
+      permissions: permissions,
     },
     JWT_SECRET,
     {
@@ -63,38 +76,25 @@ const generateToken = (user) => {
 };
 
 // ======================================================
-// Remove Password
+// Remove Password & Sensitive Data
 // ======================================================
 
-const sanitizeUser = (user) => {
-  if (!user) {
-    return null;
-  }
+const sanitizeUser = (user, permissions = []) => {
+  if (!user) return null;
 
-  const {
-    password,
-    ...safeUser
-  } = user;
+  const { password, ...safeUser } = user;
 
-  return safeUser;
+  return {
+    ...safeUser,
+    permissions,
+  };
 };
 
 // ======================================================
-// Validate Role
+// Validate User Role
 // ======================================================
 
-const validateUserRole = async ({
-  role,
-  roleId,
-}) => {
-  // ==================================================
-  // Admin
-  // ==================================================
-  //
-  // Admin is a protected system role.
-  // Admin does not require roleId.
-  //
-
+const validateUserRole = async ({ role, roleId }) => {
   if (role === "admin") {
     return {
       role: "admin",
@@ -102,62 +102,30 @@ const validateUserRole = async ({
     };
   }
 
-  // ==================================================
-  // Non-admin must have roleId
-  // ==================================================
-
   if (!roleId) {
-    throw new Error(
-      "Non-admin user-এর জন্য roleId প্রয়োজন"
-    );
+    throw new Error("Non-admin user-এর জন্য roleId প্রয়োজন");
   }
-
-  // ==================================================
-  // Validate ObjectId
-  // ==================================================
 
   let objectId;
-
   try {
-    objectId =
-      new ObjectId(roleId);
+    objectId = roleId instanceof ObjectId ? roleId : new ObjectId(roleId);
   } catch (error) {
-    throw new Error(
-      "Invalid role ID"
-    );
+    throw new Error("Invalid role ID");
   }
 
-  // ==================================================
-  // Find Active Role
-  // ==================================================
-
-  const roles =
-    getRolesCollection();
-
-  const assignedRole =
-    await roles.findOne({
-      _id: objectId,
-      isActive: true,
-    });
+  const assignedRole = await getRolesCollection().findOne({
+    _id: objectId,
+    isActive: true,
+  });
 
   if (!assignedRole) {
-    throw new Error(
-      "Assigned role পাওয়া যায়নি অথবা role inactive"
-    );
+    throw new Error("Assigned role পাওয়া যায়নি অথবা role inactive");
   }
 
-  // ==================================================
-  // Prevent assigning system admin role
-  // ==================================================
-
-  if (
-    assignedRole.name === "admin" ||
-    assignedRole.isSystemRole === true &&
-    assignedRole.name === "admin"
-  ) {
-    throw new Error(
-      "Admin role এইভাবে assign করা যাবে না"
-    );
+  if (assignedRole.name === "admin" || assignedRole.isSystemRole === true) {
+    if (assignedRole.name === "admin") {
+      throw new Error("Admin role এইভাবে assign করা যাবে না");
+    }
   }
 
   return {
@@ -170,72 +138,36 @@ const validateUserRole = async ({
 // Login
 // ======================================================
 
-const login = async (
-  email,
-  password
-) => {
-  const users =
-    getUsersCollection();
+const login = async (email, password) => {
+  const users = getUsersCollection();
 
-  // ==================================================
-  // Find User
-  // ==================================================
-
-  const user =
-    await users.findOne({
-      email:
-        email.trim().toLowerCase(),
-    });
+  const user = await users.findOne({
+    email: email.trim().toLowerCase(),
+  });
 
   if (!user) {
-    throw new Error(
-      "Email অথবা password সঠিক নয়"
-    );
+    throw new Error("Email অথবা password সঠিক নয়");
   }
-
-  // ==================================================
-  // Active Check
-  // ==================================================
 
   if (user.isActive === false) {
-    throw new Error(
-      "এই account টি বর্তমানে নিষ্ক্রিয়"
-    );
+    throw new Error("এই account টি বর্তমানে নিষ্ক্রিয়");
   }
 
-  // ==================================================
-  // Password Check
-  // ==================================================
-
-  const passwordMatched =
-    await bcrypt.compare(
-      password,
-      user.password
-    );
+  const passwordMatched = await bcrypt.compare(password, user.password);
 
   if (!passwordMatched) {
-    throw new Error(
-      "Email অথবা password সঠিক নয়"
-    );
+    throw new Error("Email অথবা password সঠিক নয়");
   }
 
-  // ==================================================
-  // Generate Token
-  // ==================================================
+  // Resolve dynamic permissions
+  const permissions = await getUserPermissions(user);
 
-  const token =
-    generateToken(user);
-
-  // ==================================================
-  // Return
-  // ==================================================
+  // Generate Token with Permissions
+  const token = generateToken(user, permissions);
 
   return {
     token,
-
-    user: sanitizeUser(
-      user
-    ),
+    user: sanitizeUser(user, permissions),
   };
 };
 
@@ -243,59 +175,29 @@ const login = async (
 // Get Current User
 // ======================================================
 
-const getCurrentUser = async (
-  userId
-) => {
-  const users =
-    getUsersCollection();
-
-  // ==================================================
-  // Validate User ID
-  // ==================================================
+const getCurrentUser = async (userId) => {
+  const users = getUsersCollection();
 
   let objectId;
-
   try {
-    objectId =
-      new ObjectId(userId);
+    objectId = userId instanceof ObjectId ? userId : new ObjectId(userId);
   } catch (error) {
-    throw new Error(
-      "Invalid user ID"
-    );
+    throw new Error("Invalid user ID");
   }
 
-  // ==================================================
-  // Find User
-  // ==================================================
-
-  const user =
-    await users.findOne({
-      _id: objectId,
-    });
+  const user = await users.findOne({ _id: objectId });
 
   if (!user) {
-    throw new Error(
-      "User পাওয়া যায়নি"
-    );
+    throw new Error("User পাওয়া যায়নি");
   }
-
-  // ==================================================
-  // Active Check
-  // ==================================================
 
   if (user.isActive === false) {
-    throw new Error(
-      "এই account টি বর্তমানে নিষ্ক্রিয়"
-    );
+    throw new Error("এই account টি বর্তমানে নিষ্ক্রিয়");
   }
 
-  // ==================================================
-  // Return Safe User
-  // ==================================================
+  const permissions = await getUserPermissions(user);
 
-  return sanitizeUser(
-    user
-  );
+  return sanitizeUser(user, permissions);
 };
 
 // ======================================================
@@ -308,113 +210,90 @@ const createUser = async ({
   password,
   role = "staff",
   roleId = null,
+  mustChangePassword = false,
 }) => {
-  const users =
-    getUsersCollection();
+  const users = getUsersCollection();
 
-  // ==================================================
-  // Basic Validation
-  // ==================================================
-
-  if (
-    !name ||
-    !email ||
-    !password
-  ) {
-    throw new Error(
-      "Name, email এবং password প্রয়োজন"
-    );
+  if (!name || !email || !password) {
+    throw new Error("Name, email এবং password প্রয়োজন");
   }
 
-  // ==================================================
-  // Normalize Email
-  // ==================================================
+  const normalizedEmail = email.trim().toLowerCase();
 
-  const normalizedEmail =
-    email.trim().toLowerCase();
-
-  // ==================================================
-  // Check Existing User
-  // ==================================================
-
-  const existingUser =
-    await users.findOne({
-      email: normalizedEmail,
-    });
+  const existingUser = await users.findOne({
+    email: normalizedEmail,
+  });
 
   if (existingUser) {
-    throw new Error(
-      "এই email দিয়ে ইতিমধ্যে একটি account রয়েছে"
-    );
+    throw new Error("এই email দিয়ে ইতিমধ্যে একটি account রয়েছে");
   }
 
-  // ==================================================
-  // Validate Role
-  // ==================================================
+  const validatedRole = await validateUserRole({ role, roleId });
 
-  const validatedRole =
-    await validateUserRole({
-      role,
-      roleId,
-    });
+  const hashedPassword = await bcrypt.hash(password, 12);
 
-  // ==================================================
-  // Hash Password
-  // ==================================================
-
-  const hashedPassword =
-    await bcrypt.hash(
-      password,
-      12
-    );
-
-  // ==================================================
-  // Create User
-  // ==================================================
-
-  const now =
-    new Date();
+  const now = new Date();
 
   const user = {
     name: name.trim(),
-
     email: normalizedEmail,
-
-    password:
-      hashedPassword,
-
-    role:
-      validatedRole.role,
-
-    roleId:
-      validatedRole.roleId,
-
+    password: hashedPassword,
+    role: validatedRole.role,
+    roleId: validatedRole.roleId,
     isActive: true,
-
+    mustChangePassword: Boolean(mustChangePassword),
     createdAt: now,
-
     updatedAt: now,
   };
 
-  // ==================================================
-  // Insert User
-  // ==================================================
+  const result = await users.insertOne(user);
 
-  const result =
-    await users.insertOne(
-      user
-    );
+  const createdUser = { ...user, _id: result.insertedId };
+  const permissions = await getUserPermissions(createdUser);
 
-  // ==================================================
-  // Return Safe User
-  // ==================================================
+  return sanitizeUser(createdUser, permissions);
+};
 
-  return sanitizeUser({
-    ...user,
+// ======================================================
+// Change Password
+// ======================================================
 
-    _id:
-      result.insertedId,
-  });
+const changePassword = async (userId, currentPassword, newPassword) => {
+  const users = getUsersCollection();
+
+  let objectId;
+  try {
+    objectId = userId instanceof ObjectId ? userId : new ObjectId(userId);
+  } catch (error) {
+    throw new Error("Invalid user ID");
+  }
+
+  const user = await users.findOne({ _id: objectId });
+
+  if (!user) {
+    throw new Error("User পাওয়া যায়নি");
+  }
+
+  const passwordMatched = await bcrypt.compare(currentPassword, user.password);
+
+  if (!passwordMatched) {
+    throw new Error("বর্তমান password টি সঠিক নয়");
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+  await users.updateOne(
+    { _id: objectId },
+    {
+      $set: {
+        password: hashedPassword,
+        mustChangePassword: false,
+        updatedAt: new Date(),
+      },
+    }
+  );
+
+  return true;
 };
 
 // ======================================================
@@ -425,7 +304,9 @@ module.exports = {
   login,
   getCurrentUser,
   createUser,
+  changePassword,
   generateToken,
   sanitizeUser,
   validateUserRole,
+  getUserPermissions,
 };

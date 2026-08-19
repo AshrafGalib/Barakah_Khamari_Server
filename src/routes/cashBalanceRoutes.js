@@ -1,122 +1,54 @@
 const express = require("express");
+const cashBalanceController = require("../controllers/cashBalanceController");
+
+const authMiddleware = require("../middleware/authMiddleware");
+const { requirePermission } = require("../middleware/permissionMiddleware");
+const { PERMISSIONS } = require("../constants/permissionConstants");
 
 const router = express.Router();
 
-const cashBalanceController =
-  require("../controllers/cashBalanceController");
-
-const authMiddleware =
-  require("../middleware/authMiddleware");
-
-const {
-  requirePermission,
-} = require("../middleware/permissionMiddleware");
-
-const {
-  PERMISSIONS,
-} = require("../constants/permissionConstants");
+// ======================================================
+// Global Middleware Configuration
+// ======================================================
+// Protect all cash balance endpoints with authentication
+router.use(authMiddleware);
 
 // ======================================================
-// Today's Cash Balance
-// ======================================================
-//
-// GET:
-// /api/cash-balance/today
-//
-// Permission:
-// cashBalance.view
-//
+// Specific Static Sub-Routes
+// Note: Must remain above dynamic /:date route to prevent parsing issues
 // ======================================================
 
+// GET /api/cash-balance/today - Fetch current day cash summary
 router.get(
   "/today",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.CASH_BALANCE_VIEW
-  ),
+  requirePermission(PERMISSIONS.CASH_BALANCE_VIEW),
   cashBalanceController.getTodayBalance
 );
 
-// ======================================================
-// Opening Balance Status
-// ======================================================
-//
-// IMPORTANT:
-// This route must remain BEFORE /:date
-//
-// GET:
-// /api/cash-balance/opening-status
-//
-// Permission:
-// cashBalance.view
-//
-// ======================================================
-
+// GET /api/cash-balance/opening-status - Check if opening balance for today is set
 router.get(
   "/opening-status",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.CASH_BALANCE_VIEW
-  ),
-  cashBalanceController
-    .getOpeningBalanceStatus
+  requirePermission(PERMISSIONS.CASH_BALANCE_VIEW),
+  cashBalanceController.getOpeningBalanceStatus
 );
 
-// ======================================================
-// Set Opening Balance
-// ======================================================
-//
-// POST:
-// /api/cash-balance/opening
-//
-// Permission:
-// cashBalance.opening
-//
-// This is a financial operation.
-// Only authorized users can set opening balance.
-//
-// ======================================================
-
+// POST /api/cash-balance/opening - Initialize daily opening cash balance
 router.post(
   "/opening",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.CASH_BALANCE_OPENING
-  ),
-  cashBalanceController
-    .setOpeningBalance
+  requirePermission(PERMISSIONS.CASH_BALANCE_OPENING),
+  cashBalanceController.setOpeningBalance
 );
 
 // ======================================================
-// Get Specific Date Balance
-// ======================================================
-//
-// GET:
-// /api/cash-balance/:date
-//
-// Example:
-// /api/cash-balance/2026-08-15
-//
-// Permission:
-// cashBalance.view
-//
-// IMPORTANT:
-// Keep this route LAST because :date is dynamic.
-//
+// Dynamic Param Resource Routes
+// Note: Placed LAST as :date matches any trailing path string
 // ======================================================
 
+// GET /api/cash-balance/:date - Fetch cash balance for specific date (e.g. 2026-08-15)
 router.get(
   "/:date",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.CASH_BALANCE_VIEW
-  ),
-  cashBalanceController
-    .getDailyBalance
+  requirePermission(PERMISSIONS.CASH_BALANCE_VIEW),
+  cashBalanceController.getDailyBalance
 );
-
-// ======================================================
-// Export
-// ======================================================
 
 module.exports = router;

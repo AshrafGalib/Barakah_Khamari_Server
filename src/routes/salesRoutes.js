@@ -1,5 +1,4 @@
 const express = require("express");
-
 const {
   getSales,
   getSale,
@@ -8,79 +7,49 @@ const {
 } = require("../controllers/salesController");
 
 const authMiddleware = require("../middleware/authMiddleware");
-
-const {
-  requirePermission,
-} = require("../middleware/permissionMiddleware");
-
-const {
-  PERMISSIONS,
-} = require("../constants/permissionConstants");
+const { requirePermission } = require("../middleware/permissionMiddleware");
+const { PERMISSIONS } = require("../constants/permissionConstants");
 
 const router = express.Router();
 
 // ======================================================
-// Sales Routes
+// Global Middleware Configuration
 // ======================================================
-
-// ==========================================
-// সব Sale
-// Permission: sales.view
-// ==========================================
-
-router.get(
-  "/",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.SALES_VIEW
-  ),
-  getSales
-);
-
-// ==========================================
-// একটি Sale
-// Permission: sales.view
-// ==========================================
-
-router.get(
-  "/:id",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.SALES_VIEW
-  ),
-  getSale
-);
-
-// ==========================================
-// নতুন Sale
-// Permission: sales.create
-// ==========================================
-
-router.post(
-  "/",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.SALES_CREATE
-  ),
-  createSale
-);
-
-// ==========================================
-// Sale Delete
-// Permission: sales.delete
-// ==========================================
-
-router.delete(
-  "/:id",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.SALES_DELETE
-  ),
-  deleteSale
-);
+// Protect all sales endpoints with authentication
+router.use(authMiddleware);
 
 // ======================================================
-// Export
+// Collection Routes: Root (/api/sales)
 // ======================================================
+
+router
+  .route("/")
+  // GET /api/sales - Fetch list of sales records
+  .get(
+    requirePermission(PERMISSIONS.SALES_VIEW),
+    getSales
+  )
+  // POST /api/sales - Create a new sale invoice
+  .post(
+    requirePermission(PERMISSIONS.SALES_CREATE),
+    createSale
+  );
+
+// ======================================================
+// Individual Resource Routes: By ID (/api/sales/:id)
+// ======================================================
+
+router
+  .route("/:id")
+  // GET /api/sales/:id - Fetch single sale details
+  .get(
+    requirePermission(PERMISSIONS.SALES_VIEW),
+    getSale
+  )
+  // DELETE /api/sales/:id - Delete sale record
+  .delete(
+    requirePermission(PERMISSIONS.SALES_DELETE),
+    deleteSale
+  );
 
 module.exports = router;

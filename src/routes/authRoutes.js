@@ -1,51 +1,40 @@
-const express = require("express");
 
+const express = require("express");
 const {
   login,
   getCurrentUser,
   createUser,
+  changePassword,
 } = require("../controllers/authController");
 
 const authMiddleware = require("../middleware/authMiddleware");
+const { requirePermission } = require("../middleware/permissionMiddleware");
+const { PERMISSIONS } = require("../constants/permissionConstants");
 
 const router = express.Router();
 
 // ======================================================
-// Authentication Routes
+// Authentication & User Account Routes
 // ======================================================
 
-// ------------------------------------------------------
-// Login
+// Public Route: User Login
 // POST /api/auth/login
-// ------------------------------------------------------
+router.post("/login", login);
 
-router.post(
-  "/login",
-  login
-);
-
-// ------------------------------------------------------
-// Current User
+// Protected Route: Get Logged In User Info
 // GET /api/auth/me
-// Protected route
-// ------------------------------------------------------
+router.get("/me", authMiddleware, getCurrentUser);
 
-router.get(
-  "/me",
-  authMiddleware,
-  getCurrentUser
-);
+// Protected Route: Change Own Password
+// POST /api/auth/change-password
+router.post("/change-password", authMiddleware, changePassword);
 
-// ------------------------------------------------------
-// Create User
+// Protected Route: Create New User (Requires USERS_CREATE permission)
 // POST /api/auth/users
-//
-// Temporary route for initial admin/user creation.
-// Later this route will be protected by admin role.
-// ------------------------------------------------------
-
 router.post(
   "/users",
+  authMiddleware,
+  requirePermission(PERMISSIONS.USERS_CREATE),
   createUser
 );
 

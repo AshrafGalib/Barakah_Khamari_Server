@@ -1,5 +1,4 @@
 const express = require("express");
-
 const {
   createRole,
   getAllRoles,
@@ -11,18 +10,23 @@ const {
 } = require("../controllers/roleController");
 
 const authMiddleware = require("../middleware/authMiddleware");
+const { requirePermission } = require("../middleware/permissionMiddleware");
+const { PERMISSIONS } = require("../constants/permissionConstants");
 
 const router = express.Router();
+
+// All role routes require authentication
+router.use(authMiddleware);
 
 // ======================================================
 // Role Management Routes
 // ======================================================
 
-// Get all available permissions
+// Get all available permissions list
 // GET /api/roles/permissions
 router.get(
   "/permissions",
-  authMiddleware,
+  requirePermission(PERMISSIONS.ROLES_VIEW),
   getAvailablePermissions
 );
 
@@ -30,7 +34,7 @@ router.get(
 // GET /api/roles
 router.get(
   "/",
-  authMiddleware,
+  requirePermission(PERMISSIONS.ROLES_VIEW),
   getAllRoles
 );
 
@@ -38,7 +42,7 @@ router.get(
 // GET /api/roles/:id
 router.get(
   "/:id",
-  authMiddleware,
+  requirePermission(PERMISSIONS.ROLES_VIEW),
   getRoleById
 );
 
@@ -46,7 +50,7 @@ router.get(
 // GET /api/roles/:id/permissions
 router.get(
   "/:id/permissions",
-  authMiddleware,
+  requirePermission(PERMISSIONS.ROLES_VIEW),
   getRolePermissions
 );
 
@@ -54,7 +58,7 @@ router.get(
 // POST /api/roles
 router.post(
   "/",
-  authMiddleware,
+  requirePermission(PERMISSIONS.ROLES_CREATE),
   createRole
 );
 
@@ -62,7 +66,7 @@ router.post(
 // PATCH /api/roles/:id
 router.patch(
   "/:id",
-  authMiddleware,
+  requirePermission(PERMISSIONS.ROLES_UPDATE),
   updateRole
 );
 
@@ -70,7 +74,7 @@ router.patch(
 // DELETE /api/roles/:id
 router.delete(
   "/:id",
-  authMiddleware,
+  requirePermission(PERMISSIONS.ROLES_DELETE),
   deleteRole
 );
 

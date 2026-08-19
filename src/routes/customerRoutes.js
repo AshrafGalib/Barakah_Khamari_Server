@@ -1,5 +1,4 @@
 const express = require("express");
-
 const {
   getCustomers,
   getCustomerById,
@@ -10,123 +9,66 @@ const {
 } = require("../controllers/customerController");
 
 const authMiddleware = require("../middleware/authMiddleware");
-
-const {
-  requirePermission,
-} = require("../middleware/permissionMiddleware");
-
-const {
-  PERMISSIONS,
-} = require("../constants/permissionConstants");
+const { requirePermission } = require("../middleware/permissionMiddleware");
+const { PERMISSIONS } = require("../constants/permissionConstants");
 
 const router = express.Router();
 
 // ======================================================
-// Customer Routes
+// Global Middleware Configuration
 // ======================================================
+// Protect all customer endpoints with authentication
+router.use(authMiddleware);
 
 // ======================================================
-// সব Customer
-// Permission: customers.view
+// Specific Business Logic Sub-Routes
+// Note: Placed above /:id to maintain strict routing priority
 // ======================================================
 
-router.get(
-  "/",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.CUSTOMERS_VIEW
-  ),
-  getCustomers
-);
-
-// ======================================================
-// একটি Customer
-// Permission: customers.view
-// ======================================================
-
-router.get(
-  "/:id",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.CUSTOMERS_VIEW
-  ),
-  getCustomerById
-);
-
-// ======================================================
-// নতুন Customer
-// Permission: customers.create
-// ======================================================
-
-router.post(
-  "/",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.CUSTOMERS_CREATE
-  ),
-  createCustomer
-);
-
-// ======================================================
-// Customer Due Payment
-//
-// Customer page থেকে Due Payment করলে:
-//
-// Customer Due ↓
-// Customer Paid ↑
-//
-// Related Sales:
-// Paid ↑
-// Due ↓
-//
-// Cash Balance:
-// Cash Inflow ↑
-//
-// Dashboard:
-// Sales Paid / Due update
-//
-// Permission: customers.duePayment
-// ======================================================
-
+// PATCH /api/customers/:id/due-payment - Process customer due payment
 router.patch(
   "/:id/due-payment",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.CUSTOMERS_DUE_PAYMENT
-  ),
+  requirePermission(PERMISSIONS.CUSTOMERS_DUE_PAYMENT || PERMISSIONS.CUSTOMERS_UPDATE),
   payCustomerDue
 );
 
 // ======================================================
-// Customer Update
-// Permission: customers.update
+// Collection Routes: Root (/api/customers)
 // ======================================================
 
-router.patch(
-  "/:id",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.CUSTOMERS_UPDATE
-  ),
-  updateCustomer
-);
+router
+  .route("/")
+  // GET /api/customers - Fetch all customers list
+  .get(
+    requirePermission(PERMISSIONS.CUSTOMERS_VIEW),
+    getCustomers
+  )
+  // POST /api/customers - Create a new customer entry
+  .post(
+    requirePermission(PERMISSIONS.CUSTOMERS_CREATE),
+    createCustomer
+  );
 
 // ======================================================
-// Customer Delete
-// Permission: customers.delete
+// Individual Resource Routes: By ID (/api/customers/:id)
 // ======================================================
 
-router.delete(
-  "/:id",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.CUSTOMERS_DELETE
-  ),
-  deleteCustomer
-);
-
-// ======================================================
-// Export
-// ======================================================
+router
+  .route("/:id")
+  // GET /api/customers/:id - Fetch single customer details
+  .get(
+    requirePermission(PERMISSIONS.CUSTOMERS_VIEW),
+    getCustomerById
+  )
+  // PATCH /api/customers/:id - Update customer details
+  .patch(
+    requirePermission(PERMISSIONS.CUSTOMERS_UPDATE),
+    updateCustomer
+  )
+  // DELETE /api/customers/:id - Delete customer entry
+  .delete(
+    requirePermission(PERMISSIONS.CUSTOMERS_DELETE),
+    deleteCustomer
+  );
 
 module.exports = router;

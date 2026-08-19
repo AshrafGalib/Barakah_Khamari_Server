@@ -1,5 +1,4 @@
 const express = require("express");
-
 const {
   getPurchases,
   getPurchase,
@@ -9,99 +8,61 @@ const {
 } = require("../controllers/purchaseController");
 
 const authMiddleware = require("../middleware/authMiddleware");
-
-const {
-  requirePermission,
-} = require("../middleware/permissionMiddleware");
-
-const {
-  PERMISSIONS,
-} = require("../constants/permissionConstants");
+const { requirePermission } = require("../middleware/permissionMiddleware");
+const { PERMISSIONS } = require("../constants/permissionConstants");
 
 const router = express.Router();
 
 // ======================================================
-// Purchase Routes
+// Global Middleware Configuration
+// ======================================================
+// Protect all purchase endpoints with authentication
+router.use(authMiddleware);
+
+// ======================================================
+// Specific Business Logic Sub-Routes
+// Note: Placed above /:id to maintain strict routing priority
 // ======================================================
 
-// ==========================================
-// সব Purchase
-// Permission: purchases.view
-// ==========================================
-
-router.get(
-  "/",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.PURCHASES_VIEW
-  ),
-  getPurchases
-);
-
-// ==========================================
-// নতুন Purchase
-// Permission: purchases.create
-// ==========================================
-
-router.post(
-  "/",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.PURCHASES_CREATE
-  ),
-  createPurchase
-);
-
-// ==========================================
-// Purchase Due Payment
-//
-// PATCH /api/purchases/:id/due-payment
-//
-// Body:
-// {
-//   "paymentAmount": 2000,
-//   "paymentMethod": "ক্যাশ"
-// }
-//
-// Permission: purchases.update
-// ==========================================
-
+// PATCH /api/purchases/:id/due-payment - Pay due amount for a purchase
 router.patch(
   "/:id/due-payment",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.PURCHASES_UPDATE
-  ),
+  requirePermission(PERMISSIONS.PURCHASES_UPDATE),
   payPurchaseDue
 );
 
-// ==========================================
-// একটি Purchase
-//
-// Permission: purchases.view
-// ==========================================
+// ======================================================
+// Collection Routes: Root (/api/purchases)
+// ======================================================
 
-router.get(
-  "/:id",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.PURCHASES_VIEW
-  ),
-  getPurchase
-);
+router
+  .route("/")
+  // GET /api/purchases - Fetch purchase history list
+  .get(
+    requirePermission(PERMISSIONS.PURCHASES_VIEW),
+    getPurchases
+  )
+  // POST /api/purchases - Create a new purchase record
+  .post(
+    requirePermission(PERMISSIONS.PURCHASES_CREATE),
+    createPurchase
+  );
 
-// ==========================================
-// Purchase Delete
-// Permission: purchases.delete
-// ==========================================
+// ======================================================
+// Individual Resource Routes: By ID (/api/purchases/:id)
+// ======================================================
 
-router.delete(
-  "/:id",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.PURCHASES_DELETE
-  ),
-  deletePurchase
-);
+router
+  .route("/:id")
+  // GET /api/purchases/:id - Fetch single purchase record details
+  .get(
+    requirePermission(PERMISSIONS.PURCHASES_VIEW),
+    getPurchase
+  )
+  // DELETE /api/purchases/:id - Delete purchase record
+  .delete(
+    requirePermission(PERMISSIONS.PURCHASES_DELETE),
+    deletePurchase
+  );
 
 module.exports = router;

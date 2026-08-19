@@ -7,9 +7,7 @@ const jwt = require("jsonwebtoken");
 const JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET) {
-  throw new Error(
-    "JWT_SECRET environment variable is missing"
-  );
+  throw new Error("JWT_SECRET environment variable is missing");
 }
 
 // ======================================================
@@ -18,36 +16,27 @@ if (!JWT_SECRET) {
 
 const authMiddleware = (req, res, next) => {
   try {
-    // ==================================================
+    // ----------------------------------------------------
     // 1. Get Authorization Header
-    // ==================================================
-
-    const authHeader =
-      req.headers.authorization;
+    // ----------------------------------------------------
+    const authHeader = req.headers.authorization;
 
     if (!authHeader) {
       return res.status(401).json({
         success: false,
-        message:
-          "Authentication token পাওয়া যায়নি",
+        message: "Authentication token পাওয়া যায়নি",
       });
     }
 
-    // ==================================================
-    // 2. Check Bearer Token
-    // ==================================================
+    // ----------------------------------------------------
+    // 2. Check Bearer Token Format
+    // ----------------------------------------------------
+    const parts = authHeader.trim().split(/\s+/);
 
-    const parts =
-      authHeader.trim().split(/\s+/);
-
-    if (
-      parts.length !== 2 ||
-      parts[0] !== "Bearer"
-    ) {
+    if (parts.length !== 2 || parts[0] !== "Bearer") {
       return res.status(401).json({
         success: false,
-        message:
-          "Invalid authentication format",
+        message: "Invalid authentication format",
       });
     }
 
@@ -56,107 +45,55 @@ const authMiddleware = (req, res, next) => {
     if (!token) {
       return res.status(401).json({
         success: false,
-        message:
-          "Authentication token পাওয়া যায়নি",
+        message: "Authentication token পাওয়া যায়নি",
       });
     }
 
-    // ==================================================
-    // 3. Verify JWT
-    // ==================================================
+    // ----------------------------------------------------
+    // 3. Verify JWT Token
+    // ----------------------------------------------------
+    const decoded = jwt.verify(token, JWT_SECRET);
 
-    const decoded =
-      jwt.verify(
-        token,
-        JWT_SECRET
-      );
-
-    // ==================================================
-    // 4. Validate Required JWT Data
-    // ==================================================
-
-    if (!decoded.userId) {
+    if (!decoded || !decoded.userId) {
       return res.status(401).json({
         success: false,
-        message:
-          "Invalid authentication token",
+        message: "Invalid authentication token",
       });
     }
 
-    // ==================================================
-    // 5. Attach User Information
-    // ==================================================
-    //
-    // Admin:
-    // role = admin
-    // roleId = null
-    //
-    // Manager/Staff:
-    // role = manager/staff
-    // roleId = assigned role ObjectId
-    //
-
+    // ----------------------------------------------------
+    // 4. Attach User Payload (Including Permissions)
+    // ----------------------------------------------------
     req.user = {
       userId: decoded.userId,
       role: decoded.role || null,
       roleId: decoded.roleId || null,
+      permissions: Array.isArray(decoded.permissions) ? decoded.permissions : [],
     };
-
-    // ==================================================
-    // 6. Continue
-    // ==================================================
 
     next();
   } catch (error) {
-    console.error(
-      "Authentication Error:",
-      error
-    );
+    console.error("Authentication Error:", error.message);
 
-    // ==================================================
-    // Token Expired
-    // ==================================================
-
-    if (
-      error.name ===
-      "TokenExpiredError"
-    ) {
+    if (error.name === "TokenExpiredError") {
       return res.status(401).json({
         success: false,
-        message:
-          "Authentication token-এর মেয়াদ শেষ হয়েছে",
+        message: "Authentication token-এর মেয়াদ শেষ হয়েছে",
       });
     }
 
-    // ==================================================
-    // Invalid JWT
-    // ==================================================
-
-    if (
-      error.name ===
-      "JsonWebTokenError"
-    ) {
+    if (error.name === "JsonWebTokenError") {
       return res.status(401).json({
         success: false,
-        message:
-          "Invalid authentication token",
+        message: "Invalid authentication token",
       });
     }
-
-    // ==================================================
-    // General Authentication Error
-    // ==================================================
 
     return res.status(401).json({
       success: false,
-      message:
-        "Authentication failed",
+      message: "Authentication failed",
     });
   }
 };
-
-// ======================================================
-// Export
-// ======================================================
 
 module.exports = authMiddleware;

@@ -1,5 +1,4 @@
 const express = require("express");
-
 const {
   getCategories,
   getCategory,
@@ -9,69 +8,54 @@ const {
 } = require("../controllers/categoryController");
 
 const authMiddleware = require("../middleware/authMiddleware");
-
-const {
-  requirePermission,
-} = require("../middleware/permissionMiddleware");
-
-const {
-  PERMISSIONS,
-} = require("../constants/permissionConstants");
+const { requirePermission } = require("../middleware/permissionMiddleware");
+const { PERMISSIONS } = require("../constants/permissionConstants");
 
 const router = express.Router();
 
 // ======================================================
-// Category Routes
+// Global Middleware Configuration
+// ======================================================
+// Protect all category endpoints with authentication
+router.use(authMiddleware);
+
+// ======================================================
+// Collection Routes: Root (/api/categories)
 // ======================================================
 
-// View all categories
-router.get(
-  "/",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.CATEGORIES_VIEW
-  ),
-  getCategories
-);
+router
+  .route("/")
+  // GET /api/categories - Fetch all categories list
+  .get(
+    requirePermission(PERMISSIONS.CATEGORIES_VIEW),
+    getCategories
+  )
+  // POST /api/categories - Create a new product category
+  .post(
+    requirePermission(PERMISSIONS.CATEGORIES_CREATE),
+    createCategory
+  );
 
-// View single category
-router.get(
-  "/:id",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.CATEGORIES_VIEW
-  ),
-  getCategory
-);
+// ======================================================
+// Individual Resource Routes: By ID (/api/categories/:id)
+// ======================================================
 
-// Create category
-router.post(
-  "/",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.CATEGORIES_CREATE
-  ),
-  createCategory
-);
-
-// Update category
-router.patch(
-  "/:id",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.CATEGORIES_UPDATE
-  ),
-  updateCategory
-);
-
-// Delete category
-router.delete(
-  "/:id",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.CATEGORIES_DELETE
-  ),
-  deleteCategory
-);
+router
+  .route("/:id")
+  // GET /api/categories/:id - Fetch single category details
+  .get(
+    requirePermission(PERMISSIONS.CATEGORIES_VIEW),
+    getCategory
+  )
+  // PATCH /api/categories/:id - Update category details
+  .patch(
+    requirePermission(PERMISSIONS.CATEGORIES_UPDATE),
+    updateCategory
+  )
+  // DELETE /api/categories/:id - Delete product category
+  .delete(
+    requirePermission(PERMISSIONS.CATEGORIES_DELETE),
+    deleteCategory
+  );
 
 module.exports = router;

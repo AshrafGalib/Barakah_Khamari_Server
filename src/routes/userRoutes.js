@@ -1,5 +1,4 @@
 const express = require("express");
-
 const {
   getUsers,
   getUserById,
@@ -11,209 +10,87 @@ const {
   getAvailableRoles,
 } = require("../controllers/userController");
 
-const authMiddleware =
-  require("../middleware/authMiddleware");
+const authMiddleware = require("../middleware/authMiddleware");
+const { requirePermission } = require("../middleware/permissionMiddleware");
 
-const {
-  requirePermission,
-} = require("../middleware/permissionMiddleware");
+// সঠিক ইমপোর্ট (Destructuring সহ)
+const { PERMISSIONS } = require("../constants/permissionConstants");
 
-const {
-  PERMISSIONS,
-} = require("../constants/permissionConstants");
-
-const router =
-  express.Router();
+const router = express.Router();
 
 // ======================================================
-// User Management Routes
+// Global Middleware Configuration
 // ======================================================
+// Protect all user management endpoints
+router.use(authMiddleware);
 
 // ======================================================
-// Get Available Roles
-//
+// Specific & Helper Routes
+// ======================================================
+
 // GET /api/users/available-roles
-//
-// Frontend user creation/edit form-এর role dropdown
-// এই endpoint থেকে roles load করবে.
-//
-// Permission:
-// users.create
-// ======================================================
-
+// Note: Placed above /:id to prevent Express from treating "available-roles" as an ID
 router.get(
   "/available-roles",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.USERS_CREATE
-  ),
+  requirePermission(PERMISSIONS.USERS_VIEW),
   getAvailableRoles
 );
 
 // ======================================================
-// Get All Users
-//
-// GET /api/users
-//
-// Optional:
-// /api/users?includeInactive=false
-//
-// Permission:
-// users.view
+// Collection Routes: Root (/api/users)
 // ======================================================
 
-router.get(
-  "/",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.USERS_VIEW
-  ),
-  getUsers
-);
+router
+  .route("/")
+  // GET /api/users - Fetch paginated/filtered user list
+  .get(
+    requirePermission(PERMISSIONS.USERS_VIEW),
+    getUsers
+  )
+  // POST /api/users - Create new user
+  .post(
+    requirePermission(PERMISSIONS.USERS_CREATE),
+    createUser
+  );
 
 // ======================================================
-// Get User By ID
-//
-// GET /api/users/:id
-//
-// Permission:
-// users.view
+// Individual Resource Routes: By ID (/api/users/:id)
 // ======================================================
 
-router.get(
-  "/:id",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.USERS_VIEW
-  ),
-  getUserById
-);
+router
+  .route("/:id")
+  // GET /api/users/:id - Fetch single user details
+  .get(
+    requirePermission(PERMISSIONS.USERS_VIEW),
+    getUserById
+  )
+  // PATCH /api/users/:id - Update basic profile details
+  .patch(
+    requirePermission(PERMISSIONS.USERS_UPDATE),
+    updateUser
+  )
+  // DELETE /api/users/:id - Remove user
+  .delete(
+    requirePermission(PERMISSIONS.USERS_DELETE),
+    deleteUser
+  );
 
 // ======================================================
-// Create User
-//
-// POST /api/users
-//
-// Body:
-//
-// {
-//   "name": "Shop Manager",
-//   "email": "manager@shop.com",
-//   "password": "password123",
-//   "roleId": "ROLE_ID"
-// }
-//
-// Permission:
-// users.create
+// Specific Field Mutation Routes
 // ======================================================
 
-router.post(
-  "/",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.USERS_CREATE
-  ),
-  createUser
-);
-
-// ======================================================
-// Update User
-//
-// PATCH /api/users/:id
-//
-// Body:
-//
-// {
-//   "name": "Updated Name",
-//   "email": "updated@email.com"
-// }
-//
-// Permission:
-// users.update
-// ======================================================
-
-router.patch(
-  "/:id",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.USERS_UPDATE
-  ),
-  updateUser
-);
-
-// ======================================================
-// Update User Role
-//
-// PATCH /api/users/:id/role
-//
-// Body:
-//
-// {
-//   "roleId": "ROLE_ID"
-// }
-//
-// Permission:
-// users.update
-// ======================================================
-
+// PATCH /api/users/:id/role - Update user's system role
 router.patch(
   "/:id/role",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.USERS_UPDATE
-  ),
+  requirePermission(PERMISSIONS.USERS_UPDATE),
   updateUserRole
 );
 
-// ======================================================
-// Activate / Deactivate User
-//
-// PATCH /api/users/:id/status
-//
-// Body:
-//
-// {
-//   "isActive": false
-// }
-//
-// Permission:
-// users.update
-// ======================================================
-
+// PATCH /api/users/:id/status - Update active/inactive status
 router.patch(
   "/:id/status",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.USERS_UPDATE
-  ),
+  requirePermission(PERMISSIONS.USERS_UPDATE),
   updateUserStatus
 );
-
-// ======================================================
-// Delete User
-//
-// DELETE /api/users/:id
-//
-// IMPORTANT:
-// Current implementation is SOFT DELETE.
-// User permanently deleted হবে না.
-// isActive = false হবে.
-//
-// Permission:
-// users.delete
-// ======================================================
-
-router.delete(
-  "/:id",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.USERS_DELETE
-  ),
-  deleteUser
-);
-
-// ======================================================
-// Export
-// ======================================================
 
 module.exports = router;

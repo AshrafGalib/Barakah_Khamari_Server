@@ -1,143 +1,90 @@
 const express = require("express");
-
 const {
   getSuppliers,
   getSupplier,
   createSupplier,
   updateSupplier,
   deleteSupplier,
-
   getSupplierDue,
   paySupplierDue,
   getSupplierPaymentHistory,
 } = require("../controllers/supplierController");
 
 const authMiddleware = require("../middleware/authMiddleware");
-
-const {
-  requirePermission,
-} = require("../middleware/permissionMiddleware");
-
-const {
-  PERMISSIONS,
-} = require("../constants/permissionConstants");
+const { requirePermission } = require("../middleware/permissionMiddleware");
+const { PERMISSIONS } = require("../constants/permissionConstants");
 
 const router = express.Router();
 
 // ======================================================
-// Supplier Routes
+// Global Middleware Configuration
+// ======================================================
+// Protect all supplier endpoints with authentication
+router.use(authMiddleware);
+
+// ======================================================
+// Specific Business Logic Sub-Routes
+// Note: Placed above /:id to maintain strict routing priority
 // ======================================================
 
-// =====================================
-// সব Supplier
-// Permission: suppliers.view
-// =====================================
-
-router.get(
-  "/",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.SUPPLIERS_VIEW
-  ),
-  getSuppliers
-);
-
-// =====================================
-// Supplier Due
-// Permission: suppliers.view
-// =====================================
-
+// GET /api/suppliers/:id/due - Get supplier remaining due
 router.get(
   "/:id/due",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.SUPPLIERS_VIEW
-  ),
+  requirePermission(PERMISSIONS.SUPPLIERS_VIEW),
   getSupplierDue
 );
 
-// =====================================
-// Supplier Payment History
-// Permission: suppliers.view
-// =====================================
-
+// GET /api/suppliers/:id/payment-history - Get supplier payment logs
 router.get(
   "/:id/payment-history",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.SUPPLIERS_VIEW
-  ),
+  requirePermission(PERMISSIONS.SUPPLIERS_VIEW),
   getSupplierPaymentHistory
 );
 
-// =====================================
-// Supplier Due Payment
-// Permission: suppliers.update
-// =====================================
-
+// POST /api/suppliers/:id/due-payment - Pay due amount to supplier
 router.post(
   "/:id/due-payment",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.SUPPLIERS_UPDATE
-  ),
+  requirePermission(PERMISSIONS.SUPPLIERS_UPDATE),
   paySupplierDue
 );
 
-// =====================================
-// একটি Supplier
-// Permission: suppliers.view
-// =====================================
+// ======================================================
+// Collection Routes: Root (/api/suppliers)
+// ======================================================
 
-router.get(
-  "/:id",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.SUPPLIERS_VIEW
-  ),
-  getSupplier
-);
+router
+  .route("/")
+  // GET /api/suppliers - Fetch supplier list
+  .get(
+    requirePermission(PERMISSIONS.SUPPLIERS_VIEW),
+    getSuppliers
+  )
+  // POST /api/suppliers - Create new supplier
+  .post(
+    requirePermission(PERMISSIONS.SUPPLIERS_CREATE),
+    createSupplier
+  );
 
-// =====================================
-// নতুন Supplier
-// Permission: suppliers.create
-// =====================================
+// ======================================================
+// Individual Resource Routes: By ID (/api/suppliers/:id)
+// ======================================================
 
-router.post(
-  "/",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.SUPPLIERS_CREATE
-  ),
-  createSupplier
-);
-
-// =====================================
-// Supplier Update
-// Permission: suppliers.update
-// =====================================
-
-router.patch(
-  "/:id",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.SUPPLIERS_UPDATE
-  ),
-  updateSupplier
-);
-
-// =====================================
-// Supplier Delete
-// Permission: suppliers.delete
-// =====================================
-
-router.delete(
-  "/:id",
-  authMiddleware,
-  requirePermission(
-    PERMISSIONS.SUPPLIERS_DELETE
-  ),
-  deleteSupplier
-);
+router
+  .route("/:id")
+  // GET /api/suppliers/:id - Fetch single supplier
+  .get(
+    requirePermission(PERMISSIONS.SUPPLIERS_VIEW),
+    getSupplier
+  )
+  // PATCH /api/suppliers/:id - Update supplier info
+  .patch(
+    requirePermission(PERMISSIONS.SUPPLIERS_UPDATE),
+    updateSupplier
+  )
+  // DELETE /api/suppliers/:id - Remove supplier
+  .delete(
+    requirePermission(PERMISSIONS.SUPPLIERS_DELETE),
+    deleteSupplier
+  );
 
 module.exports = router;
