@@ -38,6 +38,8 @@ const roleRoutes =
 const userRoutes =
   require("./routes/userRoutes");
 
+const reportRoutes = require("./routes/reportRoutes");
+
 const app = express();
 
 // ======================================================
@@ -185,6 +187,8 @@ app.use(
   "/api/users",
   userRoutes
 );
+
+app.use("/api/reports", reportRoutes);
 
 // ======================================================
 // Export
